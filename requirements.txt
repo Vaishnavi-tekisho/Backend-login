@@ -1,0 +1,32 @@
+# FastAPI Framework
+fastapi
+uvicorn[standard]
+
+# Database
+supabase
+
+# Authentication & Security
+pydantic-settings
+passlib[bcrypt]
+bcrypt==4.0.1
+python-jose[cryptography]
+
+# HTTP Client
+httpx
+
+# Form Data & Validation
+python-multipart
+email-validator
+
+# Email Service
+sendgrid
+
+# SMS Service (Optional)
+twilio
+
+# Testing
+pytest
+pytest-asyncio
+
+# Development
+python-dotenv

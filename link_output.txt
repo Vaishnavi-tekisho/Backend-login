@@ -1,0 +1,1 @@
+https://fwlnsvnemgerlriimdhp.supabase.co/auth/v1/verify?token=e69b09d4c90d5bc21a2f2bfcc29cb66607fc65f7439d68f842204563&type=recovery&redirect_to=http://localhost:5173/reset-password
