@@ -6,9 +6,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 
-from app.core.config import settings
-from app.db.supabase_client import get_supabase
-from app.models.user_model import TokenData
+from src.core.config import settings
+from src.core.database import get_supabase
+from src.core.exceptions import InvalidTokenError
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -26,14 +26,8 @@ def get_current_user(token: str = Depends(oauth2_scheme), supabase = Depends(get
         dict: User data from database
         
     Raises:
-        HTTPException: If token is invalid or user not found
+        InvalidTokenError: If token is invalid or user not found
     """
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    
     try:
         # Decode JWT token
         payload = jwt.decode(
@@ -44,19 +38,17 @@ def get_current_user(token: str = Depends(oauth2_scheme), supabase = Depends(get
         email: str = payload.get("sub")
         
         if email is None:
-            raise credentials_exception
+            raise InvalidTokenError()
             
-        token_data = TokenData(email=email)
-        
     except JWTError:
-        raise credentials_exception
+        raise InvalidTokenError()
     
     # Query database for user
-    response = supabase.table("users_login").select("*").eq("email", token_data.email).execute()
+    response = supabase.table("users_login").select("*").eq("email", email).execute()
     user = response.data[0] if response.data else None
     
     if user is None:
-        raise credentials_exception
+        raise InvalidTokenError()
     
     return user
 
@@ -82,38 +74,33 @@ def get_current_active_user(current_user: dict = Depends(get_current_user)) -> d
     return current_user
 
 
-def get_verified_user(current_user: dict = Depends(get_current_active_user)) -> dict:
+def get_current_user_optional(token: str = Depends(oauth2_scheme), supabase = Depends(get_supabase)) -> dict | None:
     """
-    Dependency to ensure the user has verified their email.
-    
-    Args:
-        current_user: User from get_current_active_user
-        
-    Returns:
-        dict: Verified user data
-        
-    Raises:
-        HTTPException: If email is not verified
-    """
-    if not current_user.get("email_verified", False):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Email not verified. Please verify your email to access this resource."
-        )
-    return current_user
-
-
-def get_optional_user(token: str = Depends(oauth2_scheme)) -> dict | None:
-    """
-    Optionally get current user (doesn't raise exception if not authenticated).
+    Get current user but don't raise error if not authenticated.
+    Returns None instead of raising.
     
     Args:
         token: JWT token from Authorization header
+        supabase: Supabase client instance
         
     Returns:
-        dict | None: User data or None
+        dict: User data if valid, None otherwise
     """
     try:
-        return get_current_user(token)
-    except HTTPException:
+        payload = jwt.decode(
+            token, 
+            settings.SECRET_KEY, 
+            algorithms=[settings.ALGORITHM]
+        )
+        email: str = payload.get("sub")
+        
+        if email is None:
+            return None
+            
+    except JWTError:
         return None
+    
+    response = supabase.table("users_login").select("*").eq("email", email).execute()
+    user = response.data[0] if response.data else None
+    
+    return user

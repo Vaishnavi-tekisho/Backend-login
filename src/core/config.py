@@ -33,11 +33,11 @@ class Settings(BaseSettings):
     # ==================== SENDGRID EMAIL ====================
     SENDGRID_API_KEY: str | None = None
     SENDGRID_FROM_EMAIL: str | None = None
-    SENDGRID_OTP_TEMPLATE_ID: str | None = None
-    SENDGRID_EMAIL_TEMPLATE_ID: str | None = None
+    SENDGRID_TEMPLATE_ID: str | None = None  # Dynamic template ID
+    SENDGRID_RESET_TEMPLATE_ID: str | None = None
     SENDGRID_EMAIL_VERIFICATION_TEMPLATE_ID: str | None = None
     SENDGRID_SUCCESSFUL_LOGIN_TEMPLATE_ID: str | None = None
-    SENDGRID_DEV_MODE: str = "false"
+    SENDGRID_DEV_MODE: str = "false"  # Set to "true" to log emails instead of sending
     
     # ==================== GMAIL SMTP ====================
     GMAIL_USERNAME: str | None = None

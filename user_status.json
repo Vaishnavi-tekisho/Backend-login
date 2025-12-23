@@ -1,0 +1,20 @@
+{
+  "id": "7ae39139-526d-40de-8938-b8c8b3f4cb42",
+  "first_name": "GINNA",
+  "last_name": "VAISHNAVI",
+  "email": "ginnavaishnavi1214@gmail.com",
+  "password": "$2b$12$XWkZ91UmSz3fP1YbqmipPedIpxworzdgGtT4k0Wd0DQq5Io2fV5pa",
+  "phone_number": "+919030534336",
+  "is_active": true,
+  "email_verified": false,
+  "phone_verification": "false",
+  "acc_created_at": "2025-12-22T18:00:36.846873",
+  "acc_updated_at": "2025-12-22T18:00:36.846897",
+  "remember_me": false,
+  "remember_token": null,
+  "remember_token_expires_at": null,
+  "password_updated_at": null,
+  "email_verification_token": "$2b$12$sfhjrjVtiSfyj9FnkSXR6.4vbk5fNyOUZqAibtHmNKO2GNOAWkr4u",
+  "email_verification_token_expiry": "2025-12-23T18:06:08.677451",
+  "email_last_verification_sent_at": "2025-12-22T18:06:08.677505+00:00"
+}

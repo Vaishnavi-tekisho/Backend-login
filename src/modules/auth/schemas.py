@@ -1,15 +1,14 @@
 """
-User Models
-Pydantic models for user-related API requests and responses.
+Auth Schemas
+Pydantic models for auth-related API requests and responses.
 """
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime
 from uuid import UUID
-import re
 
 
-# ==================== BASE MODELS ====================
+# ==================== USER LOGIN/PROFILE BASE MODELS ====================
 
 class UserLoginBase(BaseModel):
     """Base fields for users_login table."""
@@ -23,10 +22,6 @@ class UserLoginBase(BaseModel):
     remember_me: Optional[bool] = False
     remember_token: Optional[str] = None
     remember_token_expires_at: Optional[datetime] = None
-    password_updated_at: Optional[datetime] = None
-    email_verification_token: Optional[str] = None
-    email_verification_token_expiry: Optional[datetime] = None
-    email_last_verification_sent_at: Optional[datetime] = None
 
 
 class UserProfileBase(BaseModel):
@@ -38,42 +33,15 @@ class UserProfileBase(BaseModel):
     is_anonym: Optional[bool] = False
 
 
-# ==================== REQUEST MODELS ====================
+# ==================== AUTH REQUEST MODELS ====================
 
-class ChangePasswordRequest(BaseModel):
-    """Request model for changing password."""
-    current_password: str
-    new_password: str = Field(..., min_length=8)
-    confirm_new_password: str
-
-    @model_validator(mode='after')
-    def validate_passwords(self):
-        new_pw = self.new_password
-        conf_pw = self.confirm_new_password
-        curr_pw = self.current_password
-
-        if new_pw != conf_pw:
-            raise ValueError("New passwords do not match")
-        if new_pw == curr_pw:
-            raise ValueError("New password cannot be the same as the current one")
-        
-        # Rule check: at least 1 uppercase, 1 number, 1 special character
-        if not re.search(r"[A-Z]", new_pw):
-            raise ValueError("Password must contain at least one uppercase letter")
-        if not re.search(r"\d", new_pw):
-            raise ValueError("Password must contain at least one number")
-        if not re.search(r"[@$!%*?&]", new_pw):
-            raise ValueError("Password must contain at least one special character")
-            
-        return self
-
-class UserCreate(UserLoginBase):
-    """Request model for user registration (combines both for input)."""
+class UserRegister(UserLoginBase):
+    """Request model for user registration."""
     password: str = Field(..., min_length=8)
-    location: Optional[str] = None # Input often comes together
+    location: Optional[str] = None
     
-    # Internal helpers to split data
     def get_login_data(self, hashed_password: str) -> dict:
+        """Get data for users_login table insert."""
         return {
             "email": self.email,
             "password": hashed_password,
@@ -92,7 +60,7 @@ class UserCreate(UserLoginBase):
 
 
 class UserLogin(BaseModel):
-    """Request model for user login."""
+    """Request model for email/password login."""
     email: EmailStr
     password: str
     remember_me: Optional[bool] = False
@@ -105,12 +73,12 @@ class GoogleTokenRequest(BaseModel):
 
 
 class TokenLoginRequest(BaseModel):
-    """Request model for login via remember token."""
+    """Request model for remember token login."""
     remember_token: str
 
 
 class UserUpdate(BaseModel):
-    """Request model for updating user."""
+    """Request model for updating user profile."""
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     phone_number: Optional[str] = None
@@ -118,15 +86,53 @@ class UserUpdate(BaseModel):
     profile_image_url: Optional[str] = None
 
 
+# ==================== OTP REQUEST MODELS ====================
+
+class SendOTPRequest(BaseModel):
+    """Request model for sending SMS OTP."""
+    phone_number: str = Field(..., pattern=r'^\+\d{10,15}$')
+
+
+class VerifyOTPRequest(BaseModel):
+    """Request model for verifying SMS OTP."""
+    phone_number: str = Field(..., pattern=r'^\+\d{10,15}$')
+    otp_code: str = Field(..., min_length=6, max_length=6, pattern=r'^\d{6}$')
+
+
+# ==================== PASSWORD RESET REQUEST MODELS ====================
+
+class ForgotPasswordRequest(BaseModel):
+    """Request model for requesting password reset OTP."""
+    email: EmailStr
+
+
+class VerifyResetOTPRequest(BaseModel):
+    """Request model for verifying password reset OTP."""
+    email: EmailStr
+    otp: str
+
+
+class ResetPasswordRequest(BaseModel):
+    """Request model for resetting password with OTP."""
+    email: EmailStr
+    otp: str
+    new_password: str = Field(..., min_length=8)
+
+
+# ==================== EMAIL VERIFICATION REQUEST MODELS ====================
+
+class VerifyEmailRequest(BaseModel):
+    """Request model for email verification."""
+    email: EmailStr
+    token: str
+
+
 # ==================== RESPONSE MODELS ====================
 
 class UserResponse(UserLoginBase, UserProfileBase):
-    """
-    Combined response model for frontend compatibility.
-    Merges data from users_login and users_profile_login.
-    """
+    """Combined response model merging users_login and users_profile_login."""
     id: UUID
-    user_id: Optional[UUID] = None # ID from profile table
+    user_id: Optional[UUID] = None
     acc_created_at: Optional[datetime] = None
     acc_updated_at: Optional[datetime] = None
     last_login: Optional[datetime] = None
@@ -137,16 +143,10 @@ class UserResponse(UserLoginBase, UserProfileBase):
         from_attributes = True
 
 
-class Token(BaseModel):
+class TokenResponse(BaseModel):
     """JWT token response."""
     access_token: str
     token_type: str
-
-
-class TokenData(BaseModel):
-    """Decoded token data."""
-    email: Optional[str] = None
-    user_id: Optional[str] = None
 
 
 class AuthResponse(BaseModel):
@@ -154,3 +154,16 @@ class AuthResponse(BaseModel):
     access_token: str
     token_type: str
     user: UserResponse
+
+
+class OTPResponse(BaseModel):
+    """Response model for OTP operations."""
+    success: bool
+    message: str
+    expires_at: Optional[str] = None
+
+
+class PasswordResetResponse(BaseModel):
+    """Response model for password reset operations."""
+    success: bool
+    message: str

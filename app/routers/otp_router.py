@@ -2,7 +2,8 @@
 OTP Router
 Handles SMS OTP operations via Twilio.
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.db.supabase_client import get_supabase, get_supabase_admin, Client
 
 from app.core.config import settings
 from app.models.otp_model import SendOTPRequest, VerifyOTPRequest, OTPResponse
@@ -42,7 +43,7 @@ async def send_otp(request: SendOTPRequest):
 
 
 @router.post("/verify-otp", response_model=OTPResponse)
-async def verify_otp(request: VerifyOTPRequest):
+async def verify_otp(request: VerifyOTPRequest, supabase: Client = Depends(get_supabase_admin)):
     """
     Verify OTP code for phone number using Twilio Verify.
     """
@@ -62,6 +63,17 @@ async def verify_otp(request: VerifyOTPRequest):
         print(f"DEBUG: Twilio Verify Status: {verification_check.status}")
         
         if verification_check.status == "approved":
+            # Update user phone_verification status
+            try:
+                # We assume the phone number is unique to a user
+                supabase.table("users_login").update({
+                    "phone_verification": True,
+                    "phone_number": request.phone_number # Ensure it matches
+                }).eq("phone_number", request.phone_number).execute()
+                print(f"DEBUG: Updated phone verification for {request.phone_number}")
+            except Exception as e:
+                print(f"WARNING: Failed to update user DB after OTP verify: {e}")
+
             return OTPResponse(success=True, message="OTP Verified")
         else:
             return OTPResponse(success=False, message="Invalid OTP")

@@ -1,2 +1,0 @@
-Exception: password cannot be longer than 72 bytes, truncate manually if necessary (e.g. my_password[:72])
-Exception: argon2: no backends available -- recommend you install one (e.g. 'pip install argon2_cffi')

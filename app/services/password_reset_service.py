@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Tuple, Optional
 from passlib.context import CryptContext
 
-from app.db.supabase_client import get_supabase
+from app.db.supabase_client import get_supabase_admin
 from app.services.email_service import EmailService
 
 
@@ -64,13 +64,10 @@ class PasswordResetService:
     @staticmethod
     def check_user_exists(email: str) -> Tuple[bool, Optional[dict]]:
         """
-        Check if user exists in database.
-        
-        Returns:
-            Tuple of (exists: bool, user_data: dict or None)
+        Check if user exists in database and return user record.
         """
         try:
-            supabase = get_supabase()
+            supabase = get_supabase_admin()
             response = supabase.table("users_login").select("id, email").eq("email", email).execute()
             
             if response.data and len(response.data) > 0:
@@ -83,25 +80,36 @@ class PasswordResetService:
     @staticmethod
     def store_reset_otp(email: str, hashed_otp: str, expiry: datetime) -> bool:
         """
-        Store hashed OTP and expiry in user record.
-        
-        Args:
-            email: User email
-            hashed_otp: Bcrypt hashed OTP
-            expiry: Expiry datetime
-            
-        Returns:
-            bool: True if stored successfully
+        Store hashed OTP in users_profile_login via user_id.
         """
         try:
-            supabase = get_supabase()
-            print(f"DEBUG: Attempting to store OTP for {email}")
-            result = supabase.table("users_login").update({
-                "reset_otp": hashed_otp,
-                "reset_otp_expiry": expiry.isoformat()
-            }).eq("email", email).execute()
+            supabase = get_supabase_admin()
             
-            print(f"DEBUG: Supabase update result: {result}")
+            # 1. Get User ID
+            user_res = supabase.table("users_login").select("id").eq("email", email).execute()
+            if not user_res.data:
+                return False
+            user_id = user_res.data[0]["id"]
+            
+            # 2. Update Profile
+            print(f"DEBUG: Attempting to store OTP for {email} in profile")
+            
+            # Check if profile exists, if not create
+            # (Should exist from generic flows, but safety check)
+            check = supabase.table("users_profile_login").select("id").eq("user_id", user_id).execute()
+            
+            if check.data:
+                result = supabase.table("users_profile_login").update({
+                    "reset_otp": hashed_otp,
+                    "reset_otp_expiry": expiry.isoformat()
+                }).eq("user_id", user_id).execute()
+            else:
+                 result = supabase.table("users_profile_login").insert({
+                    "user_id": user_id,
+                    "reset_otp": hashed_otp,
+                    "reset_otp_expiry": expiry.isoformat()
+                }).execute()
+            
             return result.data is not None and len(result.data) > 0
         except Exception as e:
             print(f"Error storing reset OTP: {e}")
@@ -110,20 +118,25 @@ class PasswordResetService:
     @staticmethod
     def get_stored_otp(email: str) -> Tuple[Optional[str], Optional[str]]:
         """
-        Get stored OTP hash and expiry for user.
-        
-        Returns:
-            Tuple of (hashed_otp, expiry_str) or (None, None)
+        Get stored OTP hash and expiry from users_profile_login.
         """
         try:
-            supabase = get_supabase()
-            response = supabase.table("users_login").select(
+            supabase = get_supabase_admin()
+            
+            # 1. Get User ID
+            user_res = supabase.table("users_login").select("id").eq("email", email).execute()
+            if not user_res.data:
+                return None, None
+            user_id = user_res.data[0]["id"]
+            
+            # 2. Get Profile Data
+            response = supabase.table("users_profile_login").select(
                 "reset_otp, reset_otp_expiry"
-            ).eq("email", email).execute()
+            ).eq("user_id", user_id).execute()
             
             if response.data and len(response.data) > 0:
-                user = response.data[0]
-                return user.get("reset_otp"), user.get("reset_otp_expiry")
+                profile = response.data[0]
+                return profile.get("reset_otp"), profile.get("reset_otp_expiry")
             return None, None
         except Exception as e:
             print(f"Error getting stored OTP: {e}")
@@ -132,20 +145,20 @@ class PasswordResetService:
     @staticmethod
     def invalidate_otp(email: str) -> bool:
         """
-        Invalidate OTP after use (set to NULL).
-        
-        Args:
-            email: User email
-            
-        Returns:
-            bool: True if invalidated successfully
+        Invalidate OTP in users_profile_login.
         """
         try:
-            supabase = get_supabase()
-            result = supabase.table("users_login").update({
+            supabase = get_supabase_admin()
+            
+            user_res = supabase.table("users_login").select("id").eq("email", email).execute()
+            if not user_res.data:
+                return False
+            user_id = user_res.data[0]["id"]
+            
+            result = supabase.table("users_profile_login").update({
                 "reset_otp": None,
                 "reset_otp_expiry": None
-            }).eq("email", email).execute()
+            }).eq("user_id", user_id).execute()
             
             return result.data is not None
         except Exception as e:
@@ -155,26 +168,33 @@ class PasswordResetService:
     @staticmethod
     def update_password(email: str, new_password: str) -> bool:
         """
-        Update user password in database.
-        
-        Args:
-            email: User email
-            new_password: New plain text password (will be hashed)
-            
-        Returns:
-            bool: True if password updated successfully
+        Update user password in users_login and invalidate OTP in users_profile_login.
         """
         try:
-            supabase = get_supabase()
+            supabase = get_supabase_admin()
             hashed_password = pwd_context.hash(new_password)
             
+            # 1. Update Password
             result = supabase.table("users_login").update({
                 "password": hashed_password,
-                "reset_otp": None,  # Invalidate OTP
-                "reset_otp_expiry": None
+                "password_updated_at": datetime.utcnow().isoformat(),
+                "acc_updated_at": datetime.utcnow().isoformat()
             }).eq("email", email).execute()
             
-            return result.data is not None and len(result.data) > 0
+            if not result.data:
+                return False
+                
+            # 2. Invalidate OTP (Best effort)
+            try:
+                user_id = result.data[0]["id"]
+                supabase.table("users_profile_login").update({
+                    "reset_otp": None,
+                    "reset_otp_expiry": None
+                }).eq("user_id", user_id).execute()
+            except Exception as e:
+                print(f"Warning: Failed to invalidate OTP after password reset: {e}")
+            
+            return True
         except Exception as e:
             print(f"Error updating password: {e}")
             return False
@@ -318,3 +338,84 @@ class PasswordResetService:
             "success": True,
             "message": "Password reset successfully. You can now login with your new password."
         }
+
+    @classmethod
+    def request_password_reset_link(cls, email: str, redirect_url: str = "http://localhost:5173/reset-password") -> dict:
+        """
+        Request a password reset link (Manual Implementation).
+        Generates a secure token, stores its hash, and sends a link via email.
+        
+        Args:
+            email: User email address
+            redirect_url: URL to redirect to after clicking the link
+            
+        Returns:
+            dict with success status and message
+        """
+        import secrets
+        import urllib.parse
+        
+        try:
+            # 1. Check if user exists (and get details)
+            supabase = get_supabase_admin()
+            response = supabase.table("users_login").select("id, email, first_name, last_name").eq("email", email).execute()
+            
+            if not response.data:
+                return {
+                    "success": False,
+                    "error": "Account not found. Please create an account first."
+                }
+            
+            user = response.data[0]
+            
+            # 2. Generate Secure Token (URL Safe)
+            token = secrets.token_urlsafe(32)
+            
+            # 3. Hash Token and Get Expiry
+            hashed_token = cls.hash_otp(token)
+            expiry = datetime.utcnow() + timedelta(minutes=15)
+            
+            # 4. Store Hash in DB (Reusing reset_otp column)
+            store_result = cls.store_reset_otp(email, hashed_token, expiry)
+            if not store_result:
+                return {
+                    "success": False,
+                    "error": "Failed to generate reset link. Please try again."
+                }
+
+            # 5. Construct Link
+            encoded_token = urllib.parse.quote(token)
+            encoded_email = urllib.parse.quote(email)
+            
+            separator = "&" if "?" in redirect_url else "?"
+            link = f"{redirect_url}{separator}token={encoded_token}&email={encoded_email}"
+            
+            # 6. Send Email with User Context
+            user_context = {
+                "first_name": user.get("first_name", ""),
+                "last_name": user.get("last_name", ""),
+                "name": user.get("first_name", "") # Common variable
+            }
+            
+            print(f"DEBUG: Sending password reset link to {email} with context: {user_context}")
+            email_result = EmailService.send_password_reset_link(email, link, user_context)
+            
+            if not email_result:
+                return {
+                    "success": False,
+                    "error": "Failed to send reset link email. Please try again."
+                }
+            
+            return {
+                "success": True,
+                "message": "Password reset link has been sent to your email."
+            }
+            
+        except Exception as e:
+            print(f"Error sending password reset link: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "success": False,
+                "error": str(e)
+            }

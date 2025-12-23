@@ -1,9 +1,9 @@
 """
-Supabase Client
-Database connection wrapper for Supabase.
+Database Client Setup
+Supabase client initialization and access.
 """
 from supabase import create_client, Client
-from app.core.config import settings
+from src.core.config import settings
 
 
 # Initialize Supabase Client

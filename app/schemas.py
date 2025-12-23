@@ -4,9 +4,11 @@ from datetime import datetime, date
 from uuid import UUID
 
 # Shared properties
+# Shared properties
 class UserBase(BaseModel):
     email: EmailStr
-    user_name: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     phone_number: Optional[str] = None
     location: Optional[str] = None
 

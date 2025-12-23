@@ -24,15 +24,14 @@ class ForgotPasswordRequest(BaseModel):
 
 
 class VerifyResetOTPRequest(BaseModel):
-    """Request model for verifying password reset OTP."""
+    """Request model for verifying password reset OTP or Token."""
     email: EmailStr
-    otp: str = Field(..., min_length=6, max_length=6, pattern=r'^\d{6}$')
-
+    otp: str  # Relaxed constraint to allow both 6-digit OTPs and longer tokens
 
 class ResetPasswordRequest(BaseModel):
-    """Request model for resetting password with OTP."""
+    """Request model for resetting password with OTP or Token."""
     email: EmailStr
-    otp: str = Field(..., min_length=6, max_length=6, pattern=r'^\d{6}$')
+    otp: str
     new_password: str = Field(..., min_length=8)
 
 

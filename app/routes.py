@@ -30,7 +30,8 @@ async def register(user_in: schemas.UserCreate, request: Request, supabase: Clie
         user_data = {
             "email": user_in.email,
             "password": hashed_pw,
-            "user_name": user_in.user_name,
+            "first_name": user_in.first_name,
+            "last_name": user_in.last_name,
             "phone_number": user_in.phone_number,
             "location": user_in.location,
             "oauth_provider": "email",

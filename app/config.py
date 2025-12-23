@@ -20,7 +20,10 @@ class Settings(BaseSettings):
     # Email Service (SendGrid)
     SENDGRID_API_KEY: str | None = None
     SENDGRID_FROM_EMAIL: str | None = None
-    SENDGRID_TEMPLATE_ID: str | None = None  # Dynamic template ID from SendGrid
+    SENDGRID_TEMPLATE_ID: str | None = None  # Generic/Fallback
+    SENDGRID_RESET_TEMPLATE_ID: str | None = None
+    SENDGRID_EMAIL_VERIFICATION_TEMPLATE_ID: str | None = None
+    SENDGRID_SUCCESSFUL_LOGIN_TEMPLATE_ID: str | None = None
     SENDGRID_DEV_MODE: str = "false"  # Set to "true" to log emails instead of sending
     
     class Config:
