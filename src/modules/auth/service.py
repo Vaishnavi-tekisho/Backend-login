@@ -110,7 +110,8 @@ class EmailService:
             "app_name": EmailService.APP_NAME,
             "year": str(datetime.now().year)
         }
-        return EmailService.send_email_with_template(to_email, template_data)
+        template_id = getattr(settings, 'SENDGRID_OTP_TEMPLATE_ID', None)
+        return EmailService.send_email_with_template(to_email, template_data, template_id)
     
     @staticmethod
     def send_password_reset_link(to_email: str, link: str, user_context: dict = None) -> bool:
@@ -569,7 +570,7 @@ class VerificationService:
     """Service for email verification operations."""
     
     @staticmethod
-    def request_verification_email(email: str, redirect_url: str = "http://localhost:5173/verify-email") -> dict:
+    def request_verification_email(email: str, redirect_url: str = "http://localhost:5173/login/verification-success") -> dict:
         """
         Send email verification link.
         
@@ -633,8 +634,17 @@ class VerificationService:
             dict: {success: bool, message: str, error: str}
         """
         try:
+            # Check if user already verified
+            user = UserRepository.get_by_email(email)
+            if not user:
+                return {"success": False, "error": "User not found"}
+            
+            if user.get("email_verified"):
+                return {"success": True, "message": "Email verified successfully"}
+
             # Get stored token
-            stored_hash, expiry_str = EmailVerificationRepository.get_verification_token(email)
+            stored_hash = user.get("email_verification_token")
+            expiry_str = user.get("email_verification_token_expiry")
             
             if not stored_hash or not expiry_str:
                 return {"success": False, "error": "Invalid verification request"}
@@ -652,7 +662,21 @@ class VerificationService:
             if not EmailVerificationRepository.mark_email_verified(email):
                 return {"success": False, "error": "Failed to update status"}
             
-            return {"success": True, "message": "Email verified successfully"}
+            # Fetch full profile for auto-login
+            profile = UserProfileRepository.get_by_user_id(user["id"])
+            combined_user = {**user, **(profile or {})}
+            combined_user["email_verified"] = True # Ensure reflected in response
+            
+            # Create access token
+            access_token = create_access_token(data={"sub": user["email"]})
+            
+            return {
+                "success": True, 
+                "message": "Email verified successfully",
+                "access_token": access_token,
+                "token_type": "bearer",
+                "user": combined_user
+            }
         except Exception as e:
             print(f"Error verifying email: {e}")
             return {"success": False, "error": str(e)}

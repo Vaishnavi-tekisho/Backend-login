@@ -33,7 +33,8 @@ class Settings(BaseSettings):
     # ==================== SENDGRID EMAIL ====================
     SENDGRID_API_KEY: str | None = None
     SENDGRID_FROM_EMAIL: str | None = None
-    SENDGRID_TEMPLATE_ID: str | None = None  # Dynamic template ID
+    SENDGRID_TEMPLATE_ID: str | None = None  # Default/Fallback Dynamic template ID
+    SENDGRID_OTP_TEMPLATE_ID: str | None = None
     SENDGRID_RESET_TEMPLATE_ID: str | None = None
     SENDGRID_EMAIL_VERIFICATION_TEMPLATE_ID: str | None = None
     SENDGRID_SUCCESSFUL_LOGIN_TEMPLATE_ID: str | None = None

@@ -210,8 +210,9 @@ class EmailVerificationRepository:
         """Store email verification token."""
         try:
             return UserRepository.update_by_email(email, {
-                "verification_token": hashed_token,
-                "verification_token_expiry": expiry.isoformat()
+                "email_verification_token": hashed_token,
+                "email_verification_token_expiry": expiry.isoformat(),
+                "email_last_verification_sent_at": datetime.utcnow().isoformat()
             }) is not None
         except Exception as e:
             print(f"Error storing verification token: {e}")
@@ -223,7 +224,7 @@ class EmailVerificationRepository:
         try:
             user = UserRepository.get_by_email(email)
             if user:
-                return user.get("verification_token"), user.get("verification_token_expiry")
+                return user.get("email_verification_token"), user.get("email_verification_token_expiry")
             return None, None
         except Exception as e:
             print(f"Error getting verification token: {e}")
@@ -235,8 +236,8 @@ class EmailVerificationRepository:
         try:
             return UserRepository.update_by_email(email, {
                 "email_verified": True,
-                "verification_token": None,
-                "verification_token_expiry": None
+                "email_verification_token": None,
+                "email_verification_token_expiry": None
             }) is not None
         except Exception as e:
             print(f"Error marking email verified: {e}")

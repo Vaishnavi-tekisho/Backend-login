@@ -88,7 +88,7 @@ async def register(user_in: UserRegister, request: Request, background_tasks: Ba
 @router.post("/auth/request-verification")
 async def request_verification(email: str):
     """Request email verification link."""
-    redirect_url = "http://localhost:5173/verify-email"
+    redirect_url = "http://localhost:5173/login/verification-success"
     result = VerificationService.request_verification_email(email, redirect_url)
     
     if not result["success"]:

@@ -24,7 +24,7 @@ Register a new user.
 **Response:**
 ```json
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "access_token": "<TOKEN>",
   "token_type": "bearer",
   "user": {
     "id": "uuid",
@@ -49,7 +49,7 @@ Login with email and password.
 **Response:**
 ```json
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "access_token": "<TOKEN>",
   "token_type": "bearer",
   "user": { ... }
 }

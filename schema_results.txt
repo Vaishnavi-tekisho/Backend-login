@@ -1,0 +1,38 @@
+
+--- Columns in users_login ---
+  - acc_created_at
+  - acc_updated_at
+  - email
+  - email_last_verification_sent_at
+  - email_verification_token
+  - email_verification_token_expiry
+  - email_verified
+  - first_name
+  - id
+  - is_active
+  - last_name
+  - password
+  - password_updated_at
+  - phone_number
+  - phone_verification
+  - remember_me
+  - remember_token
+  - remember_token_expires_at
+
+--- Columns in users_profile_login ---
+  - activity_time
+  - banned_until
+  - deleted_at
+  - id
+  - ip_address
+  - last_login
+  - last_password_change_attempt
+  - location
+  - no_of_logins
+  - oauth_id
+  - oauth_provider
+  - password_change_attempts
+  - profile_image_url
+  - reset_otp
+  - reset_otp_expiry
+  - user_id
