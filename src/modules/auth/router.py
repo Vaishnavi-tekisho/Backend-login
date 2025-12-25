@@ -31,6 +31,7 @@ from src.modules.auth.schemas import (
     ForgotPasswordRequest,
     VerifyResetOTPRequest,
     ResetPasswordRequest,
+    ChangePasswordRequest,
     VerifyEmailRequest,
     OTPResponse,
     PasswordResetResponse
@@ -479,3 +480,111 @@ async def verify_otp(request: VerifyOTPRequest):
         success=result["success"],
         message=result["message"]
     )
+
+
+# ==================== CHANGE PASSWORD (AUTHENTICATED) ====================
+
+@router.post("/users/change-password")
+async def change_password(
+    request: ChangePasswordRequest,
+    current_user: dict = Depends(get_current_user),
+    supabase_admin: Client = Depends(get_supabase_admin)
+):
+    """
+    Change password for authenticated user.
+    
+    - Requires current password verification
+    - Only for email-based accounts (not OAuth)
+    - Rate limited: 5 attempts per hour
+    - Invalidates existing sessions on success
+    """
+    try:
+        from src.core.security import verify_password, get_password_hash
+        from datetime import datetime, timedelta
+        
+        user_id = current_user["id"]
+        email = current_user["email"]
+        
+        # Validate passwords match
+        if request.new_password != request.confirm_new_password:
+            raise HTTPException(status_code=400, detail="New passwords do not match")
+        
+        # Validate new password is different
+        # 1. Fetch user profile for OAuth check and Rate Limiting
+        profile_res = supabase_admin.table("users_profile_login").select(
+            "oauth_provider, password_change_attempts, last_password_change_attempt"
+        ).eq("user_id", user_id).execute()
+        
+        profile = profile_res.data[0] if profile_res.data else {}
+        oauth_provider = profile.get("oauth_provider")
+        attempts = profile.get("password_change_attempts") or 0
+        last_attempt_str = profile.get("last_password_change_attempt")
+        
+        # Check OAuth
+        if oauth_provider and oauth_provider != "email":
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Accounts using {oauth_provider} should use 'Set Password'. Password change is for email accounts only."
+            )
+
+        # Rate Limiting: Max 5 per hour
+        now_dt = datetime.utcnow()
+        if last_attempt_str:
+            last_attempt = datetime.fromisoformat(last_attempt_str.replace('Z', '+00:00')).replace(tzinfo=None)
+            if now_dt - last_attempt < timedelta(hours=1):
+                if attempts >= 5:
+                    raise HTTPException(
+                        status_code=429, 
+                        detail="Too many password change attempts. Please try again in an hour."
+                    )
+            else:
+                # Reset attempts if more than an hour has passed
+                attempts = 0
+
+        # Increment attempts
+        supabase_admin.table("users_profile_login").update({
+            "password_change_attempts": attempts + 1,
+            "last_password_change_attempt": now_dt.isoformat()
+        }).eq("user_id", user_id).execute()
+
+        # 2. Fetch current password hash
+        response = supabase_admin.table("users_login").select("password").eq("id", user_id).execute()
+        if not response.data:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        hashed_password = response.data[0].get("password")
+        
+        # 3. Verify current password
+        if not verify_password(request.current_password, hashed_password):
+            raise HTTPException(status_code=400, detail="Incorrect current password")
+        
+        # Check if new password is same as current
+        if verify_password(request.new_password, hashed_password):
+            raise HTTPException(status_code=400, detail="New password cannot be the same as current password")
+            
+        # 4. Hash new password
+        new_hashed_password = get_password_hash(request.new_password)
+        
+        # 5. Update database and invalidate remember tokens
+        now = datetime.utcnow().isoformat()
+        update_result = supabase_admin.table("users_login").update({
+            "password": new_hashed_password,
+            "password_updated_at": now,
+            "acc_updated_at": now,
+            "remember_token": None,
+            "remember_token_expires_at": None
+        }).eq("id", user_id).execute()
+        
+        if not update_result.data:
+            raise HTTPException(status_code=500, detail="Failed to update password")
+            
+        return {"success": True, "message": "Password changed successfully. Existing sessions have been invalidated."}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ERROR in change_password: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+

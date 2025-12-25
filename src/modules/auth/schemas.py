@@ -119,6 +119,13 @@ class ResetPasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=8)
 
 
+class ChangePasswordRequest(BaseModel):
+    """Request model for changing password (authenticated users)."""
+    current_password: str
+    new_password: str = Field(..., min_length=8)
+    confirm_new_password: str
+
+
 # ==================== EMAIL VERIFICATION REQUEST MODELS ====================
 
 class VerifyEmailRequest(BaseModel):
