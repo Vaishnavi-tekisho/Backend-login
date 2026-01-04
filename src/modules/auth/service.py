@@ -281,6 +281,10 @@ class AuthService:
             if not verify_password(password, user["password"]):
                 return False, None, None, "Invalid email or password"
             
+            # Check email verification
+            if not user.get("email_verified"):
+                return False, user, None, "Email not verified. Please verify your email before logging in."
+
             # Update stats in profile
             try:
                 profile = UserProfileRepository.get_by_user_id(user["id"])

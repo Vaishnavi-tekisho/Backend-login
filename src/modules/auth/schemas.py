@@ -158,8 +158,8 @@ class TokenResponse(BaseModel):
 
 class AuthResponse(BaseModel):
     """Authentication response with token and user data."""
-    access_token: str
-    token_type: str
+    access_token: Optional[str] = None
+    token_type: Optional[str] = None
     user: UserResponse
 
 

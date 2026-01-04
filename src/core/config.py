@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     # ==================== GOOGLE OAUTH ====================
     GOOGLE_CLIENT_ID: str | None = None
     GOOGLE_CLIENT_SECRET: str | None = None
-    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/auth/callback"
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
     
     # ==================== TWILIO SMS ====================
     TWILIO_ACCOUNT_SID: str | None = None

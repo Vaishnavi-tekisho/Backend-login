@@ -50,6 +50,18 @@ from src.core.config import settings
 router = APIRouter(tags=["Auth"])
 
 
+# ==================== DEBUG ENDPOINT ====================
+
+@router.get("/auth/debug-google")
+async def debug_google_config():
+    """Debug endpoint to check Google OAuth configuration."""
+    return {
+        "client_id": settings.GOOGLE_CLIENT_ID[:20] + "..." if settings.GOOGLE_CLIENT_ID else None,
+        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+        "has_secret": bool(settings.GOOGLE_CLIENT_SECRET)
+    }
+
+
 # ==================== SIGNUP & EMAIL VERIFICATION ====================
 
 @router.post("/auth/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
@@ -73,15 +85,12 @@ async def register(user_in: UserRegister, request: Request, background_tasks: Ba
             raise DuplicateEmailError(detail=message)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
     
-    from src.core.security import create_access_token
-    access_token = create_access_token(data={"sub": user_in.email})
-    
     # Trigger Email Verification
     background_tasks.add_task(VerificationService.request_verification_email, user_in.email)
     
     return {
-        "access_token": access_token,
-        "token_type": "bearer",
+        "access_token": None,
+        "token_type": None,
         "user": user
     }
 
@@ -182,7 +191,7 @@ async def google_login(request: Request):
     return RedirectResponse(url=google_auth_url)
 
 
-@router.get("/auth/callback")
+@router.get("/auth/google/callback")
 async def google_callback(code: str, request: Request, background_tasks: BackgroundTasks):
     """
     Handle Google OAuth callback.
@@ -463,6 +472,9 @@ async def send_otp(request: SendOTPRequest):
     """
     result = OTPService.send_otp(request.phone_number)
     
+    if not result["success"]:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result["message"])
+    
     return OTPResponse(
         success=result["success"],
         message=result["message"]
@@ -475,6 +487,9 @@ async def verify_otp(request: VerifyOTPRequest):
     Verify OTP code sent to phone number (Twilio).
     """
     result = OTPService.verify_otp(request.phone_number, request.otp_code)
+    
+    if not result["success"]:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result["message"])
     
     return OTPResponse(
         success=result["success"],

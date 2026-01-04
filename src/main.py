@@ -30,7 +30,7 @@ app.add_middleware(
 )
 
 # Include Routers
-app.include_router(auth_router)  # /auth/*, /users/* endpoints
+app.include_router(auth_router, prefix="/api/v1")  # /api/v1/auth/*, /api/v1/users/* endpoints
 
 
 @app.get("/")
